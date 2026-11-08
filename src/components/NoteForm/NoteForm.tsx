@@ -1,16 +1,18 @@
-import { Field, Form, Formik, type FormikHelpers } from "formik";
+import { ErrorMessage, Field, Form, Formik } from "formik";
 import css from "./NoteForm.module.css";
 import * as Yup from "yup";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createNote } from "../../services/noteService";
+import type { CreateNote } from "../../types/note";
+
 interface NoteFormProps {
-  title: string;
-  content: string;
-  tag: string;
+  onModalClose: () => void;
 }
 
-const initialValues: NoteFormProps = {
+const initialValues: CreateNote = {
   title: "",
   content: "",
-  tag: "",
+  tag: "Todo",
 };
 
 const NoteFormSchema = Yup.object().shape({
@@ -19,23 +21,37 @@ const NoteFormSchema = Yup.object().shape({
     .max(50, "Title is too long")
     .required("Title is required"),
   content: Yup.string().max(500, "Content is too long"),
+  tag: Yup.string()
+    .oneOf(["Todo", "Work", "Personal", "Meeting", "Shopping"])
+    .required("Choosing tag is required"),
 });
 
-function NoteForm() {
-  const handleSubmit = (
-    values: NoteFormProps,
-    actions: FormikHelpers<NoteFormProps>,
-  ) => {
-    actions.resetForm();
+function NoteForm({ onModalClose }: NoteFormProps) {
+  const queryClient = useQueryClient();
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: createNote,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      onModalClose();
+    },
+  });
+
+  const handleSubmit = (values: CreateNote) => {
+    mutate(values);
   };
 
   return (
-    <Formik initialValues={initialValues} onSubmit={handleSubmit}>
+    <Formik
+      initialValues={initialValues}
+      onSubmit={handleSubmit}
+      validationSchema={NoteFormSchema}
+    >
       <Form className={css.form}>
         <div className={css.formGroup}>
           <label htmlFor="title">Title</label>
           <Field id="title" type="text" name="title" className={css.input} />
-          <span name="title" className={css.error} />
+          <ErrorMessage name="title" component="span" className={css.error} />
         </div>
 
         <div className={css.formGroup}>
@@ -47,7 +63,7 @@ function NoteForm() {
             rows={8}
             className={css.textarea}
           />
-          <span name="content" className={css.error} />
+          <ErrorMessage name="content" component="span" className={css.error} />
         </div>
 
         <div className={css.formGroup}>
@@ -59,14 +75,22 @@ function NoteForm() {
             <option value="Meeting">Meeting</option>
             <option value="Shopping">Shopping</option>
           </Field>
-          <span name="tag" className={css.error} />
+          <ErrorMessage name="tag" component="span" className={css.error} />
         </div>
 
         <div className={css.actions}>
-          <button type="button" className={css.cancelButton}>
+          <button
+            type="button"
+            className={css.cancelButton}
+            onClick={onModalClose}
+          >
             Cancel
           </button>
-          <button type="submit" className={css.submitButton} disabled={false}>
+          <button
+            type="submit"
+            className={css.submitButton}
+            disabled={isPending}
+          >
             Create note
           </button>
         </div>
